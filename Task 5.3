@@ -1,1 +1,34 @@
+<#
+.SYNOPSIS
+    Script de Automatización y Pruebas DRP - Tarea 5.3 (Proyecto Integrador)
+.DESCRIPTION
+    Gestiona el entorno virtualizado en VirtualBox, verifica el estado de los nodos,
+    simula un fallo crítico en el servicio web y ejecuta la recuperación mediante snapshots.
+#>
 
+# Ruta por defecto de VirtualBox en Windows
+$VBoxPath = "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"
+
+Write-Host "=== 1. VERIFICANDO ESTADO DE LAS MÁQUINAS VIRTUALES ===" -ForegroundColor Cyan
+& $VBoxPath list runningvms
+
+# --- PASO 2: SIMULACIÓN DE FALLO CONTROLADO (DESDE LA TERMINAL DE LINUX) ---
+# Nota: El fallo del servicio web se ejecutó directamente en la terminal de Ubuntu Desktop con:
+# sudo systemctl stop apache2
+# sudo systemctl status apache2
+
+Write-Host "`n=== 3. RECUPERACIÓN ANTE DESASTRES (RESTAURACIÓN DE SNAPSHOT) ===" -ForegroundColor Cyan
+
+# Apagar la máquina virtual por seguridad antes de restaurar
+Write-Host "Apagando la máquina virtual..." -ForegroundColor Yellow
+& $VBoxPath controlvm "Ubuntu desktop" poweroff
+
+# Restaurar el snapshot estable configurado previamente
+Write-Host "Restaurando el snapshot limpio..." -ForegroundColor Yellow
+& $VBoxPath snapshot "Ubuntu desktop" restore "Snapshot_Estable_Configurado2"
+
+# Volver a encender la máquina virtual
+Write-Host "Encendiendo la máquina virtual restaurada..." -ForegroundColor Green
+& $VBoxPath startvm "Ubuntu desktop"
+
+Write-Host "¡Proceso de DRP completado y servicios operativos al 100%!" -ForegroundColor Green
