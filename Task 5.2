@@ -1,1 +1,47 @@
+<#
+.SYNOPSIS
+    Script de Automatización y Despliegue - Tarea 5.2 (Redes Virtuales y Recursos)
+.DESCRIPTION
+    Crea conmutadores virtuales (Puente e Interno), configura almacenamiento dinámico
+    (Thin Provisioning) y despliega las máquinas virtuales con asignación de recursos.
+#>
 
+# --- PASO 1: CONFIGURACIÓN DE REDES VIRTUALES ---
+Write-Host "Configurando conmutadores virtuales..." -ForegroundColor Cyan
+
+# Crear Conmutador Externo (Modo Puente) - Reemplaza "Wi-Fi" si es necesario
+New-VMSwitch -Name "SwitchExterno" -NetAdapterName "Wi-Fi" -AllowManagementOS $true
+
+# Crear Conmutador Interno (Aislamiento del Backend / Host-Only)
+New-VMSwitch -Name "SwitchInterno_Backend" -SwitchType Internal
+
+# Asignar IP estática a la puerta de enlace del conmutador interno en el anfitrión
+$InterfaceIndex = (Get-NetAdapter -Name "vEthernet (SwitchInterno_Backend)").ifIndex
+try {
+    New-NetIPAddress -InterfaceIndex $InterfaceIndex -IPAddress "192.168.56.1" -PrefixLength 24 -ErrorAction Stop
+} catch {
+    Write-Host "La IP de red interna ya se encontraba asignada previamente." -ForegroundColor Yellow
+}
+
+
+# --- PASO 2: APROVISIONAMIENTO DE ALMACENAMIENTO (THIN PROVISIONING) ---
+Write-Host "Creando discos virtuales dinámicos..." -ForegroundColor Cyan
+
+New-Item -ItemType Directory -Path "C:\VMs" -Force
+New-VHD -Path "C:\VMs\Web_Server.vhdx" -SizeBytes 20GB -Dynamic
+New-VHD -Path "C:\VMs\DB_Server.vhdx" -SizeBytes 20GB -Dynamic
+
+
+# --- PASO 3: CREACIÓN DE MÁQUINAS VIRTUALES Y ASIGNACIÓN DE RECURSOS ---
+Write-Host "Desplegando máquinas virtuales..." -ForegroundColor Cyan
+
+# VM 1: Servidor Web (Puente + Red Interna, 2 vCPUs, 2048 MB RAM)
+New-VM -Name "VM_Web_Server" -MemoryStartupBytes 2048MB -VHDPath "C:\VMs\Web_Server.vhdx" -SwitchName "SwitchExterno"
+Set-VMProcessor -VMName "VM_Web_Server" -Count 2
+Add-VMNetworkAdapter -VMName "VM_Web_Server" -SwitchName "SwitchInterno_Backend"
+
+# VM 2: Servidor de Base de Datos (Aislado en Red Interna, 1 vCPU, 1024 MB RAM)
+New-VM -Name "VM_DB_Server" -MemoryStartupBytes 1024MB -VHDPath "C:\VMs\DB_Server.vhdx" -SwitchName "SwitchInterno_Backend"
+Set-VMProcessor -VMName "VM_DB_Server" -Count 1
+
+Write-Host "¡Despliegue y configuración completados con éxito!" -ForegroundColor Green
